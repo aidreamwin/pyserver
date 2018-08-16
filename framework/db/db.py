@@ -22,8 +22,8 @@ class MyDBConnect(object):
 		try:
 			tmp = self._c.execute(sql)
 		except Exception as e:
-			print(e)
-			raise e
+			mlog.error("execute error[{}]".format(e))
+			return None
 		mlog.debug("execute sql[{}] success.".format(sql))
 		return tmp
 

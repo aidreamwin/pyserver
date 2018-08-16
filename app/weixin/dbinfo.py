@@ -15,7 +15,6 @@ class DBServer(object):
 				continue
 			for _type,_sql in sql_dict.items():
 				result = self.db.execute(_sql)
-				print(result)
 				if _type=="joke":
 					for raw in result:
 						# print(raw)
