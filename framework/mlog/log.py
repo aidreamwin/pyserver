@@ -5,7 +5,7 @@ import logging,os
 import time
  
 class Logger:
-  def __init__(self, path = './general.log',clevel = logging.INFO,Flevel = logging.DEBUG):
+  def __init__(self, path = './general.log',clevel = logging.DEBUG,Flevel = logging.DEBUG):
     self.logger = logging.getLogger(path)
     self.logger.setLevel(logging.DEBUG)
     fmt = logging.Formatter('%(asctime)s|%(levelname)s|%(filename)s:%(lineno)d|func:%(funcName)s|%(message)s')

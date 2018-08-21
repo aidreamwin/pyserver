@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 import time
 import sqlite3
+import pymysql
+import threading
 
 from mlog.log import mlog
 
@@ -66,27 +68,85 @@ class SqliteDB(MyDBConnect):
 		
 		if self._isConnect:
 			mlog.debug("connect sqlite success.")
+
+class MysqlDB(MyDBConnect):
+	def __init__(self, conn):
+		super(MysqlDB, self).__init__()
+		self._conn = conn
+		self._c = conn.cursor()
+		self._isConnect = True
+
+	def query(self,sql):
+		try:
+			self._c.execute(sql)
+		except Exception as e:
+			mlog.error("query error[{}]".format(e))
+			return None
+		mlog.debug("query sql[{}] success.".format(sql))
+		return self._c.fetchall()
 		
 
+# 连接池
+class MysqlConnPool(object):
+	def __init__(self,host,user,passwd,db,port=3306,charset='utf8',poolSize=1):
+		super(MysqlConnPool, self).__init__()
+		self.conns = []
+		self.poolSize = poolSize
+		self.mutex = threading.Lock()
+		self.currentSize = 0
+		self.host = host
+		self.user = user
+		self.passwd = passwd
+		self.db = db
+		self.port = port
+		self.charset = charset
+		self.init()
 
-def test():
-	db = SqliteDB("test.db")
-	# sql = "CREATE TABLE joke (id INT PRIMARY KEY NOT NULL,content TEXT NOT NULL);"
-	# for x in range(10):
-	# 	sql = "insert into joke (id,content) values (%d,'hello_%d')" % (x,x)
-	# 	db.execute(sql)
-	# db.commit()
-	sql = "select * from joke;"
-	result = db.execute(sql)
-	for row in result:
-		mlog.debug(row)
-	db.close()
+	def init(self):
+		for x in range(self.poolSize):
+			conn = pymysql.connect(host=self.host, port=self.port, user=self.user, \
+			passwd=self.passwd, db=self.db, charset=self.charset)
+			dbcon = MysqlDB(conn)
+			self.conns.append(dbcon)
+		mlog.debug("init db pool[%d] success." % self.poolSize)
+	# 获取连接
+	def Acquire(self):
+		self.mutex.acquire()
+		try:
+			if len(self.conns) > 0:
+				mlog.info("从池中获取连接,当前连接池数量:%d", len(self.conns))
+				dbcon = self.conns[0]
+				self.conns = self.conns[1:]
+				return dbcon
 
-if __name__ == '__main__':
-	test()
-			
+			mlog.info("创建新连接,当前连接池数量0")
+			self.currentSize+=1
+			conn = pymysql.connect(host=self.host, port=self.port, user=self.user, \
+			passwd=self.passwd, db=self.db, charset=self.charset)
+
+			dbcon = MysqlDB(conn)
+			return dbcon
+
+		except Exception as e:
+			raise e
+		finally:
+			self.mutex.release()
+
+	# 释放连接
+	def Release(self,dbcon):
+		self.mutex.acquire()
+		try:
+			if self.currentSize >= self.poolSize:
+				self.currentSize-=1
+				dbcon.close()
+				mlog.info("关闭连接,当前连接池数量:%d", len(self.conns))
+			else:
+				self.conns.append(dbcon)
+				mlog.info("释放连接,当前连接池数量:%d", len(self.conns))
+		except Exception as e:
+			raise e	
+		finally:
+			self.mutex.release()
 
 
-
-	
 		
